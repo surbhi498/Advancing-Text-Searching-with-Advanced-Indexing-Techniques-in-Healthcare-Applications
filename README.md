@@ -1,8 +1,4 @@
-# Advancing Text Searching with Advanced Indexing Techniques in Healthcare Applications
-
-![Healthcare AI](https://via.placeholder.com/800x300.png?text=Healthcare+AI+RAG+System)
-
-## Overview
+# Advancing Text Searching with Advanced Indexing Techniques in Healthcare Applications(In Progress)
 
 Welcome to the project repository for advancing text searching with advanced indexing techniques in healthcare applications. This project implements a powerful Retrieval-Augmented Generation (RAG) system using cutting-edge AI technologies, specifically designed to enhance text searching capabilities within the healthcare domain.
 
@@ -17,39 +13,45 @@ Welcome to the project repository for advancing text searching with advanced ind
 
 Explore the capabilities of our project with our detailed [YouTube video](https://youtu.be/nKCKUcnQ390).
 
-## 🛠 Installation
+## Installation
 
-Get started with these steps to set up the project locally:
+To get started with this project, follow these steps:
 
-1. **Clone the repository**:
+1. **Install Dependencies**:
    ```bash
-   git clone https://github.com/yourusername/Advancing-Text-Searching-with-Advanced-Indexing-Techniques-in-Healthcare-Applications.git
-   cd Advancing-Text-Searching-with-Advanced-Indexing-Techniques-in-Healthcare-Applications
-Install dependencies:
+   pip install -r requirements.txt
+   ```
 
-pip install -r requirements.txt
-Set up Qdrant:
+2. **Set up Qdrant**:
+   - Follow the [Qdrant Installation Guide](https://qdrant.tech/documentation/quick_start/) to install and configure Qdrant.
 
-Follow the Qdrant Installation Guide to install and configure Qdrant.
-Configure the application:
+3. **Configure the Application**:
+   - Ensure configuration files for BioLLM, ClinicalBert, Langchain, and Llama CPP are correctly set up.
 
-Ensure configuration files for BioLLM, ClinicalBert, Langchain, and Llama CPP are correctly set up.
-Run the application:
+4. **Run the Application**:
+   ```bash
+   uvicorn app:app
+   ```
 
-python main.py
-💡 Usage
-Querying the system: Input medical queries via the application's interface for detailed information retrieval.
-Text generation: Utilize BioLLM 8B to generate comprehensive medical responses.
-👥 Contributing
-We welcome contributions to enhance this project. Here's how you can contribute:
+## 💡 Usage
 
-Fork the repository.
-Create a new branch (git checkout -b feature-name).
-Commit your changes (git commit -am 'Add feature').
-Push to the branch (git push origin feature-name).
-Open a Pull Request with detailed information about your changes.
-📜 License
-This project is licensed under the MIT License. See the LICENSE file for details.
+- **Querying the System**: Input medical queries via the application's interface for detailed information retrieval.
+- **Text Generation**: Utilize BioLLM 8B to generate comprehensive medical responses.
 
-📞 Contact
-For questions or suggestions, please open an issue or contact the repository owner at surbhisharma9099@gmail.com
+## 👥 Contributing
+
+We welcome contributions to enhance this project! Here's how you can contribute:
+
+1. Fork the repository.
+2. Create a new branch (`git checkout -b feature-name`).
+3. Commit your changes (`git commit -am 'Add feature'`).
+4. Push to the branch (`git push origin feature-name`).
+5. Open a Pull Request with detailed information about your changes.
+
+## 📜 License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+
+## 📞 Contact
+
+For questions or suggestions, please open an issue or contact the repository owner at [surbhisharma9099@gmail.com](mailto:surbhisharma9099@gmail.com).
