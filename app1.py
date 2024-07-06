@@ -111,7 +111,7 @@ from transformers import AutoTokenizer, AutoModel
 
 
 # Set your Hugging Face API token
-os.environ['HUGGINGFACE_HUB_TOKEN'] = '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'
+os.environ['HUGGINGFACE_HUB_TOKEN'] = ''
 
 model_name = "mistralai/Mistral-7B-Instruct-v0.1"
 model_file = "mistral-7b-instruct.q4_0.bin"
