@@ -12,6 +12,8 @@ from langchain_community.vectorstores import Qdrant
 import os
 import json
 from huggingface_hub import hf_hub_download
+from langchain.retrievers import EnsembleRetriever
+from ingest import keyword_retriever
 
 app = FastAPI()
 
@@ -29,7 +31,8 @@ local_llm = "openbiollm-llama3-8b.Q5_K_M.gguf"
 llm = LlamaCpp(
     model_path= local_llm,
     temperature=0.3,
-    max_tokens=2048,
+    # max_tokens=2048,
+    n_ctx=2048,
     top_p=1
 )
 
@@ -58,7 +61,9 @@ db = Qdrant(client=client, embeddings=embeddings, collection_name="vector_db")
 prompt = PromptTemplate(template=prompt_template, input_variables=['context', 'question'])
 
 retriever = db.as_retriever(search_kwargs={"k":1})
-
+ensemble_retriever = EnsembleRetriever(retrievers=[retriever,
+                                                   keyword_retriever],
+                                       weights=[0.5, 0.5])
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
@@ -66,7 +71,7 @@ async def read_root(request: Request):
 @app.post("/get_response")
 async def get_response(query: str = Form(...)):
     chain_type_kwargs = {"prompt": prompt}
-    qa = RetrievalQA.from_chain_type(llm=llm, chain_type="stuff", retriever=retriever, return_source_documents=True, chain_type_kwargs=chain_type_kwargs, verbose=True)
+    qa = RetrievalQA.from_chain_type(llm=llm, chain_type="stuff", retriever=ensemble_retriever, return_source_documents=True, chain_type_kwargs=chain_type_kwargs, verbose=True)
     response = qa(query)
     print(response)
     answer = response['result']
