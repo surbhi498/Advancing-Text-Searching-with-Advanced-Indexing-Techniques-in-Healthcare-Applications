@@ -2,3 +2,5 @@ qdrant_data
 myenv
 openbiollm-llama3-8b.Q5_K_M.gguf
 __pycache__
+secrets.toml
+.streamlit/

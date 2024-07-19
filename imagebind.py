@@ -131,3 +131,10 @@ if document:
     print(f"Embedding for document {doc_id}: {embedding}")
 
 
+
+
+
+
+
+
+
