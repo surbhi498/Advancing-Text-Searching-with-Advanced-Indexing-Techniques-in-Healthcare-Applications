@@ -1,13 +1,81 @@
 # Advancing Text Searching with Advanced Indexing Techniques in Healthcare Applications(In Progress)
 
-Welcome to the project repository for advancing text searching with advanced indexing techniques in healthcare applications. This project implements a powerful Retrieval-Augmented Generation (RAG) system using cutting-edge AI technologies, specifically designed to enhance text searching capabilities within the healthcare domain.
+Welcome to the project repository for advancing text searching with advanced indexing techniques in healthcare applications. This project implements a powerful Retrieval-Augmented Generation (RAG) system using cutting-edge AI technologies, specifically designed to enhance text searching capabilities within the healthcare domain.I have also implemented Multimodal Text Searching for Medical Documents.
 
-## 🚀 Features
+## 🚀 Features For Text Based Medical Query Based System
 
 - **BioLLM 8B**: Advanced language model for generating and processing medical text.
 - **ClinicalBert**: State-of-the-art embedding model for accurate representation of medical texts.
 - **Qdrant**: Self-hosted Vector Database (Vector DB) for efficient storage and retrieval of embeddings.
 - **Langchain & Llama CPP**: Orchestration frameworks for seamless integration and workflow management.
+
+# Medical Knowledge Base Query System
+
+A multimodal medical information retrieval system combining text and image-based querying for comprehensive medical knowledge access.
+
+## Features For Multimodality Medical Query Based System:
+
+![Multimodal Medical Information Retrieval](./Medical_RAG/multimodal.png)
+
+### 🧠 Multimodal Medical Information Retrieval
+- Combines text and image-based querying for comprehensive medical knowledge access
+- Uses Qdrant vector database to store and retrieve both text and image embeddings
+
+### 🔤 Advanced Natural Language Processing
+- Utilizes ClinicalBERT for domain-specific text embeddings
+- Implements NVIDIA's Palmyra-med-70b model for medical language understanding
+
+### 🖼️ Image Analysis Capabilities
+- Incorporates CLIP (Contrastive Language-Image Pre-training) for image feature extraction
+- Generates image summaries using Google's Gemini 1.5 Flash model
+
+### 📄 PDF Processing
+- Extracts text and images from medical PDF documents
+- Implements intelligent chunking strategies for text processing
+
+### 🔍 Vector Search
+- Uses Qdrant for efficient similarity search on both text and image vectors
+- Implements hybrid search combining CLIP-based image similarity and text-based summary similarity
+
+### 🖥️ Interactive User Interface
+- Gradio-based web interface for easy querying and result visualization
+- Displays relevant text responses alongside related medical images
+
+### 🧩 Extensible Architecture
+- Modular design allowing for easy integration of new models or data sources
+- Supports both local and cloud-based model deployment
+
+### ⚡ Performance Optimization
+- Implements batching and multi-threading for efficient processing of large document sets
+- Utilizes GPU acceleration where available
+
+### 🎛️ Customizable Retrieval
+- Adjustable similarity thresholds for image retrieval
+- Configurable number of top-k results for both text and image queries
+
+### 📊 Comprehensive Visualization
+- Displays query results with both textual information and related images
+- Provides a gallery view of all extracted images from the knowledge base
+
+### 🔐 Environment Management
+- Uses .env file for secure API key management
+- Supports both CPU and GPU environments
+
+## Installation
+
+[Add installation instructions here]
+
+## Usage
+
+[Add usage instructions here]
+
+## Contributing
+
+[Add contribution guidelines here]
+
+## License
+
+[Add license information here]
 
 ## 🎥 Video Demonstration
 
