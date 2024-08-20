@@ -85,9 +85,18 @@ To get started with this project, follow these steps:
    - Ensure configuration files for BioLLM, ClinicalBert, Langchain, and Llama CPP are correctly set up.
 
 4. **Run the Application**:
+if you want to run the application in Flask mode
    ```bash
    uvicorn app:app
    ```
+if you want to run the application through Streamlit
+``bash
+streamlit run Streaming.py
+
+if you want to run the multimodal application run it through Gradio Interface
+```bash
+python combinedmultimodal.py
+```
 
 ## 💡 Usage
 
