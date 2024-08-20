@@ -22,7 +22,7 @@ A multimodal medical information retrieval system combining text and image-based
 
 ### 🔤 Advanced Natural Language Processing
 - Utilizes ClinicalBERT for domain-specific text embeddings
-- Implements NVIDIA's Palmyra-med-70b model for medical language understanding
+- Implements NVIDIA's Palmyra-med-70b model for medical language understanding fast Inference time.
 
 ### 🖼️ Image Analysis Capabilities
 - Incorporates CLIP (Contrastive Language-Image Pre-training) for image feature extraction
@@ -85,11 +85,11 @@ To get started with this project, follow these steps:
    - Ensure configuration files for BioLLM, ClinicalBert, Langchain, and Llama CPP are correctly set up.
 
 4. **Run the Application**:
-if you want to run the application in Flask mode
+if you want to run the text reterival application in Flask mode
    ```bash
    uvicorn app:app
    ```
-if you want to run the application through Streamlit
+if you want to run the text reterival application through Streamlit
 ``bash
 streamlit run Streaming.py
 ```
