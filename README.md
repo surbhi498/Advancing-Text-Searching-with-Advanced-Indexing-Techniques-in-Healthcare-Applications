@@ -14,9 +14,10 @@ Welcome to the project repository for advancing text searching with advanced ind
 A multimodal medical information retrieval system combining text and image-based querying for comprehensive medical knowledge access.
 
 ## Features For Multimodality Medical Query Based System:
-
-![DEMO-SCREENSHOT](images/multimodal.png)
 [Watch the video on YouTube](https://youtu.be/pNy7RqfRUrc?si=1HQgq54oHT6YoR0B)
+![DEMO-SCREENSHOT](images/multimodal.png)
+
+
 
 ### 🧠 Multimodal Medical Information Retrieval
 - Combines text and image-based querying for comprehensive medical knowledge access
