@@ -92,6 +92,7 @@ if you want to run the application in Flask mode
 if you want to run the application through Streamlit
 ``bash
 streamlit run Streaming.py
+```
 
 if you want to run the multimodal application run it through Gradio Interface
 ```bash
