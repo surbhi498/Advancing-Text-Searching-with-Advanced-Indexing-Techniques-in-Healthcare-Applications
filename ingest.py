@@ -64,7 +64,6 @@ texts = text_splitter.split_documents(documents)
 
 # Get elements
 
-
 print("Create Vector Database")
 url = "http://localhost:6333"
 client = QdrantClient(url=url, prefer_grpc=False)
