@@ -15,9 +15,6 @@ A multimodal medical information retrieval system combining text and image-based
 
 ## Features For Multimodality Medical Query Based System:
 [Watch the video on YouTube](https://youtu.be/pNy7RqfRUrc?si=1HQgq54oHT6YoR0B)
-![DEMO-SCREENSHOT](images/multimodal.png)
-
-
 
 ### 🧠 Multimodal Medical Information Retrieval
 - Combines text and image-based querying for comprehensive medical knowledge access
@@ -65,6 +62,8 @@ The high level architectural framework for this application is given as follows:
 - Uses .env file for secure API key management
 - Supports both CPU and GPU environments
 
+### DEMO SCREENSHOT
+![DEMO-SCREENSHOT](images/multimodal.png)
 
 ## 🎥 Video Demonstration
 
