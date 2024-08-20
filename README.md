@@ -43,7 +43,9 @@ A multimodal medical information retrieval system combining text and image-based
 
 ### 🧩 Extensible Architecture
 - Modular design allowing for easy integration of new models or data sources
-- Supports both local and cloud-based model deployment
+- Supports both local and cloud-based model deployment 
+The high level architectural framework for this application is given as follows:
+![System Architecture Diagram](images/architecture.png)
 
 ### ⚡ Performance Optimization
 - Implements batching and multi-threading for efficient processing of large document sets
@@ -61,21 +63,6 @@ A multimodal medical information retrieval system combining text and image-based
 - Uses .env file for secure API key management
 - Supports both CPU and GPU environments
 
-## Installation
-
-[Add installation instructions here]
-
-## Usage
-
-[Add usage instructions here]
-
-## Contributing
-
-[Add contribution guidelines here]
-
-## License
-
-[Add license information here]
 
 ## 🎥 Video Demonstration
 
