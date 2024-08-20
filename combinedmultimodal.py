@@ -15,21 +15,30 @@ from llama_index.core import (
     ServiceContext,
     SimpleDirectoryReader,
 )
-
+import threading
+from dotenv import load_dotenv
+from llama_index.llms.nvidia import NVIDIA
+from open_clip import create_model_from_pretrained, get_tokenizer
+from llama_index.core import Settings
+from llama_index.core import VectorStoreIndex
+from llama_index.core.vector_stores import VectorStoreQuery
+from llama_index.core.query_engine import RetrieverQueryEngine
 from tqdm import tqdm
 from transformers import AutoTokenizer, AutoModel
 from langchain.embeddings.base import Embeddings
 from llama_index.embeddings.langchain import LangchainEmbedding
 from langchain.embeddings.huggingface import HuggingFaceEmbeddings
 from llama_index.core import Settings
+from transformers import AutoProcessor, AutoModel
 import hashlib
 import uuid
 import os
+import gradio as gr
 import torch
 import clip
+import open_clip
 import numpy as np
 from llama_index.core.schema import ImageDocument
-from llama_index.core.vector_stores import VectorStoreQuery
 import cv2
 import matplotlib.pyplot as plt
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -41,6 +50,15 @@ import logging
 import concurrent.futures
 import logging
 from llama_index.core import set_global_service_context
+from llama_index.core import Document as LlamaIndexDocument
+import getpass
+import os
+from transformers import VisionEncoderDecoderModel, ViTImageProcessor, AutoTokenizer
+from sentence_transformers import util
+from transformers import AutoTokenizer, AutoModelForCausalLM
+import base64
+from google.generativeai import GenerativeModel, configure
+import google.generativeai as genai
 
 # Configure logging
 # logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -53,7 +71,7 @@ class MetadataMode:
     
 # Define the vectors configuration
 vectors_config = {
-    "vector_size": 512,  # or whatever the dimensionality of your vectors is
+    "vector_size": 768,  # or whatever the dimensionality of your vectors is
     "distance": "Cosine"  # can be "Cosine", "Euclidean", etc.
 }
 class ClinicalBertEmbeddingWrapper:
@@ -103,33 +121,47 @@ class ClinicalBertEmbeddingWrapper:
         agg_embedding = embeddings_tensor.mean(dim=0)
 
         return agg_embedding.tolist()
+    
+
+# Load environment variables
+load_dotenv()
+genai.configure(api_key=os.environ["GEMINI_API_KEY"])
+nvidia_api_key = os.getenv("NVIDIA_API_KEY")
+if not nvidia_api_key:
+    raise ValueError("NVIDIA_API_KEY not found in .env file")
+
+os.environ["NVIDIA_API_KEY"] = nvidia_api_key
 
 model_name = "aaditya/OpenBioLLM-Llama3-8B-GGUF"
 model_file = "openbiollm-llama3-8b.Q5_K_M.gguf"
+QDRANT_URL = "https://f1e9a70a-afb9-498d-b66d-cb248e0d5557.us-east4-0.gcp.cloud.qdrant.io:6333"
+QDRANT_API_KEY = "REXlX_PeDvCoXeS9uKCzC--e3-LQV0lw3_jBTdcLZ7P5_F6EOdwklA"
 
 # Download model
 model_path = hf_hub_download(model_name, filename=model_file, local_dir='./')
-
+llm = NVIDIA(model="writer/palmyra-med-70b")
+llm.model
 local_llm = "openbiollm-llama3-8b.Q5_K_M.gguf"
 # Initialize ClinicalBert embeddings model
-
-
 # text_embed_model = ClinicalBertEmbeddings(model_name="medicalai/ClinicalBERT")
 text_embed_model = ClinicalBertEmbeddingWrapper(model_name="medicalai/ClinicalBERT")
+# Intially I was using this biollm but for faster text response during inference I am going for external models
+#but with this also it works fine.
 llm1 = LlamaCpp(
         model_path=local_llm,
         temperature=0.3,
         n_ctx=2048,
         top_p=1
     )
-Settings.llm = llm1
+Settings.llm = llm
 Settings.embed_model = text_embed_model
 # Define ServiceContext with ClinicalBertEmbeddings for text
 service_context = ServiceContext.from_defaults(
-    llm = llm1,
+    llm = llm,
     embed_model=text_embed_model  # Use ClinicalBert embeddings model
 )
 set_global_service_context(service_context)
+# Just for logging and Debugging
 # Log ServiceContext details
 # logging.debug(f"LLM: {service_context.llm}")
 # logging.debug(f"Embed Model: {service_context.embed_model}")
@@ -146,8 +178,28 @@ try:
 except Exception as e:
     print(f"Error initializing Qdrant client: {e}")
     raise
+# load Text documents from the data_wiki directory
+# text_documents = SimpleDirectoryReader("./Data").load_data()
+# Load documents
+loader = DirectoryLoader("./Data/", glob="**/*.pdf", show_progress=True, loader_cls=UnstructuredFileLoader)
+documents = loader.load()
+# Print document names
+for doc in documents:
+    print(f"Processing document: {doc.metadata.get('source', 'Unknown')}")
+# Split documents into chunks
+text_splitter = RecursiveCharacterTextSplitter(chunk_size=700, chunk_overlap=70)
+texts = text_splitter.split_documents(documents)
 
-# Create QdrantVectorStore using QdrantClient and the collection name "pdf_text"
+
+
+print(f"Loaded {len(documents)} documents")
+print(f"Split into {len(texts)} chunks")
+# Convert langchain documents to llama_index documents
+text_documents = [
+    LlamaIndexDocument(text=t.page_content, metadata=t.metadata)
+    for t in texts
+]
+# Initialize Qdrant vector store
 try:
     text_vector_store = QdrantVectorStore(
         client=text_client, collection_name="pdf_text"
@@ -168,32 +220,18 @@ except Exception as e:
 
 storage_context = StorageContext.from_defaults(vector_store=text_vector_store)
 
-# load Text documents from the data_wiki directory
-text_documents = SimpleDirectoryReader("./Data").load_data()
-# for i, doc in enumerate(text_documents):
-#     print(f"Document {i+1} length: {len(doc.text)}")
-#     print(f"Document {i+1} content (first 100 chars): {doc.text[:100]}")
-
-# for i, doc in enumerate(text_documents):
-#     embedding = service_context.embed_model.embed(doc.text)
-#     print(f"Document {i+1} embedding: {embedding[:10]}")  # Print first 10 values
-
-# sample_text = text_documents[0].text[:512]  # Take a sample from the first document
-# embedding = text_embed_model.embed(sample_text)
-# print(f"Sample embedding: {embedding[:10]}...")  # Print the first 10 values of the embedding
-
-# create VectorStoreIndex using the text documents and StorageContext
-wiki_text_index = VectorStoreIndex.from_documents(
-    text_documents,
-    storage_context=storage_context,
-    service_context=service_context
-)
+wiki_text_index = VectorStoreIndex.from_documents(text_documents
+    # , storage_context=storage_context
+    , service_context=service_context
+    )
 print(f"VectorStoreIndex created with {len(wiki_text_index.docstore.docs)} documents")
-# define the text query engine
-text_query_engine = wiki_text_index.as_query_engine()
-print(f"Text query engine type: {type(text_query_engine)}")
 
+# define the streaming query engine
+streaming_qe = wiki_text_index.as_query_engine(streaming=True)
 print(len(text_documents))
+
+# Function to query the text vector database
+# Modify the process_query function
 
 model, preprocess = clip.load("ViT-B/32")
 input_resolution = model.visual.input_resolution
@@ -244,18 +282,51 @@ for pdf_file in pdf_directory.glob("*.pdf"):
         import traceback
         traceback.print_exc()
         continue   
-    # # Iterate through each file in the directory
+# Function to summarize images
+def summarize_image(image_path):
+    # Load and encode the image
+    with open(image_path, "rb") as image_file:
+        encoded_image = base64.b64encode(image_file.read()).decode('utf-8')
+
+    # Create a GenerativeModel object
+    model = GenerativeModel('gemini-1.5-flash')
+
+    # Prepare the prompt
+    prompt = """
+    You are an expert in analyzing medical images. Please provide a detailed description of this medical image, including:
+    1. You are a bot that is good at analyzing images related to Dog's health
+    2. The body part or area being examined
+    3. Any visible structures, organs, or tissues
+    4. Any abnormalities, lesions, or notable features
+    5. Any other relevant medical diagram description.
+
+    Please be as specific and detailed as possible in your analysis.
+    """
+
+    # Generate the response
+    response = model.generate_content([
+        prompt,
+        {"mime_type": "image/jpeg", "data": encoded_image}
+    ])
+
+    return response.text
+   
+# # Iterate through each file in the directory
 for image_file in os.listdir(image_path):
     if image_file.endswith(('.jpg', '.jpeg', '.png')):
         # Generate a standard UUID for the image
         image_uuid = str(uuid.uuid4())
         image_file_name = image_file
         image_file_path = image_path / image_file
-
+        # Generate image summary
+        # image_summary = generate_image_summary_with(str(image_file_path), model, feature_extractor, tokenizer, device)
+        # image_summary = generate_summary_with_lm(str(image_file_path), preprocess, model, device, tokenizer, lm_model)
+        image_summary = summarize_image(image_file_path)
         # Construct metadata entry for the image
         image_metadata_dict[image_uuid] = {
             "filename": image_file_name,
-            "img_path": str(image_file_path)  # Store the absolute path to the image
+            "img_path": str(image_file_path), # Store the absolute path to the image
+            "summary": image_summary  # Add the summary to the metadata
         }
 
         # Limit the number of images processed per folder
@@ -303,10 +374,6 @@ plot_images_with_opencv(image_metadata_dict)
 # set the device to use for the CLIP model, either CUDA (GPU) or CPU, depending on availability
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print(device)
-
-model, preprocess = clip.load("ViT-B/32", device=device)
-print(clip.available_models())
-
 # Function to preprocess image using OpenCV
 def preprocess_image(img):
     # Convert BGR to RGB
@@ -314,6 +381,10 @@ def preprocess_image(img):
     # Convert the image to a PIL Image and then preprocess
     img_pil = Image.fromarray(img_rgb)
     return preprocess(img_pil)
+    # Use BiomedCLIP processor for preprocessing
+    # return preprocess(images=img_pil, return_tensors="pt")
+    # return preprocess(img_pil).unsqueeze(0)
+    
 
 img_emb_dict = {}
 with torch.no_grad():
@@ -327,6 +398,7 @@ with torch.no_grad():
                 if img is not None:
                     # Preprocess image
                     image = preprocess_image(img).unsqueeze(0).to(device)
+                    # image = preprocess_image(img).to(device)
 
                     # Extract image features
                     image_features = model.encode_image(image)
@@ -341,6 +413,8 @@ with torch.no_grad():
 len(img_emb_dict) #22 image so 22 img emb 
 
 
+
+
 # create a list of ImageDocument objects, one for each image in the dataset
 img_documents = []
 for image_filename in image_metadata_dict:
@@ -348,11 +422,13 @@ for image_filename in image_metadata_dict:
     if image_filename in img_emb_dict:
         filename = image_metadata_dict[image_filename]["filename"]
         filepath = image_metadata_dict[image_filename]["img_path"]
+        summary = image_metadata_dict[image_filename]["summary"]
         #print(filepath)
 
         # create an ImageDocument for each image
         newImgDoc = ImageDocument(
-            text=filename, metadata={"filepath": filepath}
+            text=filename, metadata={"filepath": filepath, "summary": summary}  # Include the summary in the metadata
+            
         )
 
         # set image embedding on the ImageDocument
@@ -378,7 +454,8 @@ def retrieve_results_from_image_index(query):
 
     # encode the text tensor using the CLIP model to produce a query embedding
     query_embedding = model.encode_text(text).tolist()[0]
-
+    # Encode the query using ClinicalBERT for text similarity
+    clinical_query_embedding = text_embed_model.embed_query(query)
     # create a VectorStoreQuery
     image_vector_store_query = VectorStoreQuery(
         query_embedding=query_embedding,
@@ -390,8 +467,35 @@ def retrieve_results_from_image_index(query):
     image_retrieval_results = image_vector_store.query(
         image_vector_store_query
     )
-    return image_retrieval_results
+    if image_retrieval_results.nodes:
+        best_score = -1
+        best_image = None
 
+        for node, clip_score in zip(image_retrieval_results.nodes, image_retrieval_results.similarities):
+            image_path = node.metadata["filepath"]
+            image_summary = node.metadata.get("summary", "")  # Assuming summaries are stored in metadata
+
+            # Calculate text similarity between query and image summary
+            summary_embedding = text_embed_model.embed_query(image_summary)
+            # text_score = util.cosine_similarity(
+            #     [clinical_query_embedding], [summary_embedding]
+            # )[0][0]
+            # Use util.cos_sim for cosine similarity
+            text_score = util.cos_sim(torch.tensor([clinical_query_embedding]), 
+                                      torch.tensor([summary_embedding]))[0][0].item()
+
+
+            # Calculate average similarity score
+            avg_score = (clip_score + text_score) / 2
+
+            if avg_score > best_score:
+                best_score = avg_score
+                best_image = image_path
+
+        return best_image, best_score
+
+    return None, 0.0
+  
 def plot_image_retrieve_results(image_retrieval_results):
     """ Take a list of image retrieval results and create a new figure """
 
@@ -423,402 +527,95 @@ def plot_image_retrieve_results(image_retrieval_results):
 
     plt.tight_layout()
     plt.show()
-def image_query(query):
-    image_retrieval_results = retrieve_results_from_image_index(query)
-    plot_image_retrieve_results(image_retrieval_results) 
+def get_all_images():
+    image_paths = []
+    for _, metadata in image_metadata_dict.items():
+        image_paths.append(metadata["img_path"])
+    return image_paths
 
-query1 = "What is gingivitis?"
-# generate image retrieval results
-image_query(query1)
-
-# generate text retrieval results
-text_retrieval_results = text_query_engine.query(query1)
-print(f"Type of text retrieval results: {type(text_retrieval_results)}")
-print(f"Content of text retrieval results: {text_retrieval_results.response}")
-print("Text retrieval results: \n" + str(text_retrieval_results.response)) 
-
-
-# # import os
-# # import uuid
-# # from llama_index.vector_stores.qdrant import QdrantVectorStore
-# # from llama_index.core import VectorStoreIndex, StorageContext
-# # import qdrant_client
-# # import torch
-# # from langchain.text_splitter import RecursiveCharacterTextSplitter
-# # import clip
-# # from llama_index.core import Document 
-# # from langchain_community.llms import LlamaCpp
-# # import numpy as np
-# # from huggingface_hub import hf_hub_download
-# # from tqdm import tqdm
-# # from transformers import AutoTokenizer, AutoModel
-# # from langchain.embeddings.base import Embeddings
-# # from llama_index.embeddings.langchain import LangchainEmbedding
-# # from langchain.embeddings.huggingface import HuggingFaceEmbeddings
-# # from llama_index.core import Settings
-# # import hashlib
-# # import cv2
-# # import matplotlib.pyplot as plt
-# # from unstructured.partition.pdf import partition_pdf
-# # from pathlib import Path
-# # from PIL import Image
-# # import logging
-
-# # Configure logging
-# logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
-
-# # Define MetadataMode class (can be adjusted as per your need)
-# class MetadataMode:
-#     EMBED = "embed"
-#     INLINE = "inline"
-#     NONE = "none"
-
-# # ClinicalBert embedding wrapper class
-# class ClinicalBertEmbeddingWrapper:
-#     def __init__(self, model_name: str = "medicalai/ClinicalBERT"):
-#         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-#         self.model = AutoModel.from_pretrained(model_name)
-#         self.model.eval()
-
-#     def embed(self, text: str):
-#         inputs = self.tokenizer(text, return_tensors="pt", padding=True, truncation=True, max_length=512)
-#         with torch.no_grad():
-#             outputs = self.model(**inputs)
-#         embeddings = self.mean_pooling(outputs, inputs['attention_mask'])
-#         return embeddings.squeeze().tolist()
-
-#     def mean_pooling(self, model_output, attention_mask):
-#         token_embeddings = model_output[0]
-#         input_mask_expanded = attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
-#         return torch.sum(token_embeddings * input_mask_expanded, 1) / torch.clamp(input_mask_expanded.sum(1), min=1e-9)
+def load_image(image_path):
+    return Image.open(image_path)
     
-#     def embed_documents(self, texts):
-#         return [self.embed(text) for text in texts]
+# Define the combined query function
+def combined_query(query, similarity_threshold=0.3):
+    # Text query
+    text_response = streaming_qe.query(query)
+    text_result = ""
+    for text in text_response.response_gen:
+        text_result += text
 
-#     def embed_query(self, text):
-#         return self.embed(text)
+    # Image query
+    top_image_path, similarity_score = retrieve_results_from_image_index(query)
+    
+    if similarity_score >= similarity_threshold:
+        return text_result, top_image_path, similarity_score
+    else:
+        return text_result, None, similarity_score
+def gradio_interface(query):
+    text_result, image_path, similarity_score = combined_query(query)
+    top_image = load_image(image_path) if image_path else None
+    all_images = [load_image(path) for path in get_all_images()]
+    return text_result, top_image, all_images, f"Similarity Score: {similarity_score:.4f}"  
 
-#     def get_text_embedding_batch(self, text_batch, show_progress=False):
-#         embeddings = []
-#         num_batches = len(text_batch)
-#         batch_size = 8
-#         for i in tqdm(range(0, num_batches, batch_size), desc="Processing Batches", disable=not show_progress):
-#             batch_texts = text_batch[i:i + batch_size]
-#             batch_embeddings = self.embed_documents(batch_texts)
-#             embeddings.extend(batch_embeddings)
-#         return embeddings
+with gr.Blocks() as iface:
+    gr.Markdown("# Medical Knowledge Base Query System")
+    
+    with gr.Row():
+        query_input = gr.Textbox(lines=2, placeholder="Enter your medical query here...")
+        submit_button = gr.Button("Submit")
+    
+    with gr.Row():
+        text_output = gr.Textbox(label="Text Response")
+        image_output = gr.Image(label="Top Related Image (if similarity > threshold)")
+    
+    similarity_score_output = gr.Textbox(label="Similarity Score")
+    
+    gallery_output = gr.Gallery(label="All Extracted Images", show_label=True, elem_id="gallery")
+    
+    submit_button.click(
+        fn=gradio_interface,
+        inputs=query_input,
+        outputs=[text_output, image_output, gallery_output, similarity_score_output]
+    )
 
-#     def get_agg_embedding_from_queries(self, queries):
-#         embeddings = [torch.tensor(self.embed(query)) for query in queries]
-#         embeddings_tensor = torch.stack(embeddings)
-#         agg_embedding = embeddings_tensor.mean(dim=0)
-#         return agg_embedding.tolist()
-
-# # Set up the Qdrant client
-# QDRANT_URL = "https://f1e9a70a-afb9-498d-b66d-cb248e0d5557.us-east4-0.gcp.cloud.qdrant.io:6333"
-# QDRANT_API_KEY = "REXlX_PeDvCoXeS9uKCzC--e3-LQV0lw3_jBTdcLZ7P5_F6EOdwklA"
-
-# # Download the model
-# model_name = "aaditya/OpenBioLLM-Llama3-8B-GGUF"
-# model_file = "openbiollm-llama3-8b.Q5_K_M.gguf"
-# model_path = hf_hub_download(model_name, filename=model_file, local_dir='./')
-
-# local_llm = "openbiollm-llama3-8b.Q5_K_M.gguf"
-
-# # Initialize the embedding model
-# text_embed_model = ClinicalBertEmbeddingWrapper(model_name="medicalai/ClinicalBERT")
-# Settings.embed_model = text_embed_model
-
-# # Define ServiceContext with ClinicalBertEmbeddings for text
-# service_context = ServiceContext.from_defaults(
-#     llm=LlamaCpp(
-#         model_path=local_llm,
-#         temperature=0.3,
-#         n_ctx=2048,
-#         top_p=1
-#     ),
-#     embed_model=text_embed_model,
-# )
-
-
-# set_global_service_context(service_context)
-# # Initialize Qdrant client and vector stores
-# try:
-#     text_client = qdrant_client.QdrantClient(
-#         url=QDRANT_URL,
-#         api_key=QDRANT_API_KEY,
-#         port=443,
-#     )
-#     logging.info("Qdrant client initialized successfully.")
-# except Exception as e:
-#     logging.error(f"Error initializing Qdrant client: {e}")
-#     raise
-
-# try:
-#     text_vector_store = QdrantVectorStore(
-#         client=text_client, collection_name="pdf_text"
-#     )
-#     logging.info("Qdrant vector store for text initialized successfully.")
-# except Exception as e:
-#     logging.error(f"Error initializing Qdrant vector store for text: {e}")
-#     raise
-
-# try:
-#     image_vector_store = QdrantVectorStore(
-#         client=text_client, collection_name="pdf_img"
-#     )
-#     logging.info("Qdrant vector store for images initialized successfully.")
-# except Exception as e:
-#     logging.error(f"Error initializing Qdrant vector store for images: {e}")
-#     raise
-
-# storage_context = StorageContext.from_defaults(vector_store=text_vector_store)
-
-# # Load Text documents
-# try:
-#     text_documents = SimpleDirectoryReader("./Data").load_data()
-#     logging.info(f"Loaded {len(text_documents)} text documents.")
-# except Exception as e:
-#     logging.error(f"Error loading text documents: {e}")
-#     raise
-
-# # Create VectorStoreIndex using the text documents
-# try:
-#     wiki_text_index = VectorStoreIndex.from_documents(
-#         text_documents,
-#         storage_context=storage_context,
-#         service_context=service_context,
-#     )
-#     logging.info(f"VectorStoreIndex created with {len(wiki_text_index.docstore.docs)} documents")
-# except Exception as e:
-#     logging.error(f"Error creating VectorStoreIndex: {e}")
-#     raise
-
-# # Define the text query engine
-# text_query_engine = wiki_text_index.as_query_engine()
-
-# # Load and process images
-# pdf_directory = Path("./data")
-# image_path = Path("./images1")
-# image_path.mkdir(exist_ok=True, parents=True)
-
-# image_metadata_dict = {}
-# MAX_IMAGES_PER_PDF = 15
-# image_uuid = 0
-
-# for pdf_file in pdf_directory.glob("*.pdf"):
-#     images_per_pdf = 0
-#     logging.info(f"Processing: {pdf_file}")
-
-#     try:
-#         raw_pdf_elements = partition_pdf(
-#             filename=str(pdf_file),
-#             extract_images_in_pdf=True,
-#             infer_table_structure=True,
-#             chunking_strategy="by_title",
-#             max_characters=4000,
-#             new_after_n_chars=3800,
-#             combine_text_under_n_chars=2000,
-#             extract_image_block_output_dir=image_path,
-#         )
-#     except Exception as e:
-#         logging.error(f"Error processing {pdf_file}: {e}")
-#         continue
-
-# for image_file in os.listdir(image_path):
-#     if image_file.endswith(('.jpg', '.jpeg', '.png')):
-#         image_uuid = str(uuid.uuid4())
-#         image_file_name = image_file
-#         image_file_path = image_path / image_file
-
-#         image_metadata_dict[image_uuid] = {
-#             "filename": image_file_name,
-#             "img_path": str(image_file_path)
-#         }
-
-#         if len(image_metadata_dict) >= MAX_IMAGES_PER_PDF:
-#             break
-
-# logging.info(f"Number of items in image_dict: {len(image_metadata_dict)}")
-
-# # Display images using OpenCV
-# def plot_images_with_opencv(image_metadata_dict):
-#     original_images_urls = []
-#     images_shown = 0
-
-#     plt.figure(figsize=(16, 16))
-
-#     for image_id in image_metadata_dict:
-#         img_path = image_metadata_dict[image_id]["img_path"]
-#         if os.path.isfile(img_path):
-#             try:
-#                 img = cv2.imread(img_path)
-#                 if img is not None:
-#                     img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-#                     plt.subplot(8, 8, len(original_images_urls) + 1)
-#                     plt.imshow(img_rgb)
-#                     plt.xticks([])
-#                     plt.yticks([])
-#                     original_images_urls.append(image_metadata_dict[image_id]["filename"])
-#                     images_shown += 1
-#                     if images_shown >= 64:
-#                         break
-#             except Exception as e:
-#                 logging.error(f"Error processing image {img_path}: {e}")
-
-#     plt.tight_layout()
-#     plt.show()
-
-# plot_images_with_opencv(image_metadata_dict)
-
-# # Function to preprocess image using OpenCV
-# def preprocess_image(img):
-#     # Convert BGR to RGB
-#     img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-#     # Convert the image to a PIL Image and then preprocess
-#     img_pil = Image.fromarray(img_rgb)
-#     return preprocess(img_pil)
-
-# device = "cuda" if torch.cuda.is_available() else "cpu"
-# model, preprocess = clip.load("ViT-B/32", device=device)
-
-# logging.info(f"Loaded CLIP model with device: {device}")
-
-# # Preprocess and encode images
-# img_emb_dict = {}
-# with torch.no_grad():
-#     for image_id in image_metadata_dict:
-#         img_file_path = image_metadata_dict[image_id]["img_path"]
-#         if os.path.isfile(img_file_path):
-#             try:
-#                 img = cv2.imread(img_file_path)
-#                 if img is not None:
-#                     image = preprocess_image(img).unsqueeze(0).to(device)
-#                     image_features = model.encode_image(image)
-#                     img_emb_dict[image_id] = image_features
-#                 else:logging.warning(f"Failed to load image {img_file_path}")
-#             except Exception as e:
-#                 logging.error(f"Error processing image {img_file_path}: {e}")
-
-# logging.info(f"Number of image embeddings generated: {len(img_emb_dict)}")
-
-# # Create ImageDocument objects for each image in the dataset
-# img_documents = []
-# for image_filename in image_metadata_dict:
-#     if image_filename in img_emb_dict:
-#         filename = image_metadata_dict[image_filename]["filename"]
-#         filepath = image_metadata_dict[image_filename]["img_path"]
-
-#         newImgDoc = ImageDocument(
-#             text=filename, metadata={"filepath": filepath}
-#         )
-
-#         # Set image embedding on the ImageDocument
-#         newImgDoc.embedding = img_emb_dict[image_filename].tolist()[0]
-#         img_documents.append(newImgDoc)
-
-# logging.info(f"Number of ImageDocument objects created: {len(img_documents)}")
-
-# # Define storage context for images
-# storage_context = StorageContext.from_defaults(vector_store=image_vector_store)
-
-# # Create image index
-# try:
-#     image_index = VectorStoreIndex.from_documents(
-#         img_documents,
-#         storage_context=storage_context
-#     )
-#     logging.info(f"Image index created with {len(image_index.docstore.docs)} documents.")
-# except Exception as e:
-#     logging.error(f"Error creating Image Index: {e}")
-#     raise
-
-# # Function to retrieve results from the image index
-# def retrieve_results_from_image_index(query):
-#     text = clip.tokenize(query).to(device)
-#     query_embedding = model.encode_text(text).tolist()[0]
-
-#     image_vector_store_query = VectorStoreQuery(
-#         query_embedding=query_embedding,
-#         similarity_top_k=1,  # returns the top 1 image
-#         mode="default",
-#     )
-
-#     image_retrieval_results = image_vector_store.query(
-#         image_vector_store_query
-#     )
-#     return image_retrieval_results
-
-# # Function to plot image retrieval results
-# def plot_image_retrieve_results(image_retrieval_results):
-#     plt.figure(figsize=(16, 5))
-
-#     img_cnt = 0
-
-#     for returned_image, score in zip(
-#         image_retrieval_results.nodes, image_retrieval_results.similarities
-#     ):
-#         img_name = returned_image.text
-#         img_path = returned_image.metadata["filepath"]
-
-#         image = cv2.imread(img_path)
-#         image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-
-#         plt.subplot(2, 3, img_cnt + 1)
-#         plt.title("{:.4f}".format(score))
-#         plt.imshow(image_rgb)
-#         plt.xticks([])
-#         plt.yticks([])
-#         img_cnt += 1
-
-#     plt.tight_layout()
-#     plt.show()
-
-# # Function to query and retrieve images based on text
+    # Load all images on startup
+    iface.load(lambda: ["", None, [load_image(path) for path in get_all_images()], ""], 
+               outputs=[text_output, image_output, gallery_output, similarity_score_output])  
+# Launch the Gradio interface
+iface.launch(share=True)
+# just to check if it works or not
 # def image_query(query):
-#     try:
-#         image_retrieval_results = retrieve_results_from_image_index(query)
-#         plot_image_retrieve_results(image_retrieval_results)
-#         return image_retrieval_results
-#     except Exception as e:
-#         logging.error(f"Error during image retrieval: {e}")
-#         return None
-# def text_retrieval(query):
-#     try:
-#         text_retrieval_results = text_query_engine.query(query)
-#         logging.info(f"Type of text retrieval results: {type(text_retrieval_results)}")
-#         logging.info(f"Content of text retrieval results: {text_retrieval_results.response}")
-#         return text_retrieval_results.response
-#     except Exception as e:
-#         logging.error(f"Error during text retrieval: {e}")
-#         return None    
-# def parallel_query(query):
-#     with concurrent.futures.ThreadPoolExecutor() as executor:
-#         text_future = executor.submit(text_retrieval, query)
-#         image_future = executor.submit(image_query, query)
+#     image_retrieval_results = retrieve_results_from_image_index(query)
+#     plot_image_retrieve_results(image_retrieval_results) 
 
-#         text_result = text_future.result()
-#         image_result = image_future.result()
-
-#     return text_result, image_result
-
-# # Query and retrieve text and image results in parallel
 # query1 = "What is gingivitis?"
-# text_result, image_result = parallel_query(query1)
+# # generate image retrieval results
+# image_query(query1)
 
-# # Display the text results
-# if text_result:
-#     print("Text retrieval results: \n" + str(text_result))
+# # Modify your text query function
+# # def text_query(query):
+# #     text_retrieval_results = process_query(query, text_embed_model, k=10)
+# #     return text_retrieval_results
+# # Function to query the text vector database
 
-# # # Query and retrieve images based on the text query
-# # query1 = "What is gingivitis?"
-# # image_query(query1)
 
-# # # Query and retrieve text results
-# # try:
-# #     text_retrieval_results = text_query_engine.query(query1)
-# #     logging.info(f"Type of text retrieval results: {type(text_retrieval_results)}")
-# #     logging.info(f"Content of text retrieval results: {text_retrieval_results.response}")
-# #     print("Text retrieval results: \n" + str(text_retrieval_results.response))
-# # except Exception as e:
-# #     logging.error(f"Error during text retrieval: {e}")
+# def text_query(query: str, k: int = 10):
+#     # Create a VectorStoreIndex from the existing vector store
+#     index = VectorStoreIndex.from_vector_store(text_vector_store)
+    
+#     # Create a retriever with top-k configuration
+#     retriever = index.as_retriever(similarity_top_k=k)
+    
+#     # Create a query engine
+#     query_engine = RetrieverQueryEngine.from_args(retriever)
+    
+#     # Execute the query
+#     response = query_engine.query(query)
+    
+#     return response
+
+# # text_retrieval_results = text_query(query1)
+# streaming_response = streaming_qe.query(
+#     query1
+# )
+# streaming_response.print_response_stream()
