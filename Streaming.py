@@ -102,7 +102,7 @@ def setup_qdrant():
             st.write(f"Collection '{collection_name}' created successfully.")
 
         embeddings = load_embeddings()
-        st.write("Embeddings loaded successfully.")
+        st.write("Embeddings model loaded successfully.")
 
         return Qdrant(client=client, embeddings=embeddings, collection_name=collection_name)
     
