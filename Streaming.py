@@ -29,8 +29,8 @@ qdrant_url = st.secrets["QDRANT_URL"]
 qdrant_api_key = st.secrets["QDRANT_API_KEY"]
 
 # For debugging only - remove or comment out these lines after verification
-st.write(f"QDRANT_URL: {qdrant_url}")
-st.write(f"QDRANT_API_KEY: {qdrant_api_key}")
+#st.write(f"QDRANT_URL: {qdrant_url}")
+#st.write(f"QDRANT_API_KEY: {qdrant_api_key}")
 
 class ClinicalBertEmbeddings(Embeddings):
     def __init__(self, model_name: str = "medicalai/ClinicalBERT"):
