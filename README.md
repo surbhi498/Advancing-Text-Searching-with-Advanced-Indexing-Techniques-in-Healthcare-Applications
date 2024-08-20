@@ -15,6 +15,7 @@ A multimodal medical information retrieval system combining text and image-based
 
 ## Features For Multimodality Medical Query Based System:
 
+![DEMO-SCREENSHOT](images/multimodal.png)
 [Watch the video on YouTube](https://youtu.be/pNy7RqfRUrc?si=1HQgq54oHT6YoR0B)
 
 ### 🧠 Multimodal Medical Information Retrieval
