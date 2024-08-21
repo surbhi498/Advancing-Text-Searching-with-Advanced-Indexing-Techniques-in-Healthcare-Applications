@@ -125,6 +125,7 @@ llama-parse
 llama_cpp_python==0.2.44
 lxml
 Markdown
+libpthread-dev
 markdown-it-py
 MarkupSafe
 marshmallow
