@@ -122,7 +122,7 @@ llama-index-readers-file
 llama-index-readers-llama-parse
 llama-index-vector-stores-qdrant
 llama-parse
-llama_cpp_python
+llama_cpp_python==0.2.44
 lxml
 Markdown
 markdown-it-py
