@@ -1,5 +1,6 @@
 aiodns
 aiofiles
+cmake
 aiohttp
 aiohttp-retry
 aiosignal
