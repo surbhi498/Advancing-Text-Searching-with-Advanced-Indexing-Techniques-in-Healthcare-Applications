@@ -258,7 +258,9 @@
 # XlsxWriter
 # yacs
 # yarl
-git+https://github.com/ggerganov/llama.cpp.git#egg=llama-cpp
+
+git+https://github.com/ggerganov/llama.cpp.git#egg=llama-cpp-scripts
+
 aiodns
 aiofiles
 aiohttp
