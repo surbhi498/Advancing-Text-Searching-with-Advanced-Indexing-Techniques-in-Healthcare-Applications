@@ -21,6 +21,7 @@ chardet==5.2.0
 charset-normalizer==3.3.2
 click==8.1.7
 clip
+cmake==3.30.2
 colorama==0.4.6
 coloredlogs==15.0.1
 contourpy==1.2.0
