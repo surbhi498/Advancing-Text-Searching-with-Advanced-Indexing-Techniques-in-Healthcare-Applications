@@ -142,7 +142,7 @@ numpy==1.26.4
 olefile==0.47
 omegaconf==2.3.0
 onnx==1.15.0
-onnxruntime==1.15.1
+onnxruntime
 open_clip_torch==2.26.1
 openai==1.35.7
 opencv-python==4.9.0.80
