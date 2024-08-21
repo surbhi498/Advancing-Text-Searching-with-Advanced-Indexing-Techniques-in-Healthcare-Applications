@@ -23,7 +23,11 @@ from langchain.retrievers import EnsembleRetriever
 
 # Set page configuration
 st.set_page_config(layout="wide")
-
+st.markdown("""
+    <meta http-equiv="Content-Security-Policy" 
+    content="default-src 'self'; object-src 'self'; frame-src 'self' data:; 
+    script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline';">
+""", unsafe_allow_html=True)
 # Streamlit secrets
 qdrant_url = st.secrets["QDRANT_URL"]
 qdrant_api_key = st.secrets["QDRANT_API_KEY"]
@@ -182,6 +186,7 @@ def main():
         texts = text_splitter.split_documents(documents)
         
         # Update the Qdrant database with the new PDF content
+        
         try:
             db.add_documents(texts)
             st.success("PDF processed and vector database updated!")
