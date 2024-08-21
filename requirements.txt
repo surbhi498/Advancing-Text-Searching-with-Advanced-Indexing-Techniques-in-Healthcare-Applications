@@ -184,8 +184,6 @@ python-docx
 python-dotenv
 python-iso639
 python-liquid
-python-magic
-python-magic-bin
 python-multipart
 python-pptx
 pytorchvideo
