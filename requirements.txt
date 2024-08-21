@@ -233,7 +233,7 @@ tomlkit==0.12.0
 toolz==0.12.1
 torch
 torchaudio
-torchvision==0.14.0
+torchvision
 tornado==6.4.1
 tqdm==4.66.2
 transformers==4.39.3
