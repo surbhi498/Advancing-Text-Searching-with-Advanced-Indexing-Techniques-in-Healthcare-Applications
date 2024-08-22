@@ -21,10 +21,25 @@ from huggingface_hub import hf_hub_download
 from tempfile import NamedTemporaryFile
 from langchain.retrievers import EnsembleRetriever
 import urllib
-
+import nltk
+import os
 # Add this at the beginning of your script
 import logging
 logging.basicConfig(level=logging.DEBUG)
+
+
+# Define the path for NLTK data
+nltk_data_path = '/tmp/nltk_data'
+os.makedirs(nltk_data_path, exist_ok=True)
+
+# Set NLTK data path environment variable
+nltk.data.path.append(nltk_data_path)
+
+# Download required NLTK data
+try:
+    nltk.data.find('tokenizers/punkt')
+except LookupError:
+    nltk.download('punkt', download_dir=nltk_data_path)
 
 # Set page configuration
 st.set_page_config(layout="wide")
