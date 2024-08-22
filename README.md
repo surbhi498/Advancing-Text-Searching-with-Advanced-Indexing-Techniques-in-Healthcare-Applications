@@ -1,3 +1,9 @@
+---
+title: Medical_RAG
+app_file: combinedmultimodal.py
+sdk: gradio
+sdk_version: 4.41.0
+---
 # Advancing Text Searching with Advanced Indexing Techniques in Healthcare Applications(In Progress)
 
 Welcome to the project repository for advancing text searching with advanced indexing techniques in healthcare applications. This project implements a powerful Retrieval-Augmented Generation (RAG) system using cutting-edge AI technologies, specifically designed to enhance text searching capabilities within the healthcare domain.I have also implemented Multimodal Text Searching for Medical Documents.
@@ -98,6 +104,17 @@ if you want to run the multimodal application run it through Gradio Interface
 ```bash
 python combinedmultimodal.py
 ```
+5. **Installation of the Application through Docker**:
+Ensure both Streamingnewversion.py and combinemultimodal.py are in your project directory.
+Build the Docker image:
+```bash
+docker build -t medical-rag-app .
+```
+Run the container, mounting your .env file and exposing both ports:
+```bash
+docker run -p 8501:8501 -p 7860:7860 --env-file .env medical-rag-app
+```
+
 
 ## 💡 Usage
 
